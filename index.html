@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>監視器即時動態查看器</title>
+  <title>高雄市監視器即時動態查看器</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -17,7 +17,6 @@
       font-size: 18px;
       margin: 0 0 12px 0;
     }
-    /* 監視器清單按鈕列 */
     .cam-list {
       display: flex;
       flex-wrap: wrap;
@@ -40,9 +39,8 @@
       font-weight: 600;
     }
 
-    /* 畫面顯示區 */
     .viewer {
-      max-width: 720px;
+      max-width: 820px;
       background: #1e293b;
       border-radius: 12px;
       padding: 14px;
@@ -60,10 +58,11 @@
     }
     .controls {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       align-items: center;
     }
-    .controls button, .controls select {
+    .controls button, .controls select, .controls a {
       padding: 5px 10px;
       border-radius: 6px;
       border: 1px solid #475569;
@@ -71,29 +70,21 @@
       color: #f8fafc;
       font-size: 13px;
       cursor: pointer;
+      text-decoration: none;
     }
     .screen-box {
       position: relative;
       width: 100%;
-      aspect-ratio: 16 / 10;
+      height: 520px;
       background: #000;
       border-radius: 8px;
       overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
-    .screen-box img {
+    .screen-box iframe {
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      border: none;
       display: block;
-    }
-    .msg {
-      color: #94a3b8;
-      font-size: 14px;
-      text-align: center;
-      padding: 16px;
     }
   </style>
 </head>
@@ -101,48 +92,37 @@
 
   <h1>點選監視器查看最新動態</h1>
 
-  <!-- 1. 監視器清單（可自行增減） -->
   <div id="cam-list" class="cam-list"></div>
 
-  <!-- 2. 畫面視窗 -->
   <div class="viewer">
     <div class="toolbar">
       <span id="cam-title">尚未選擇監視器</span>
       <div class="controls">
-        <button id="btn-refresh">立即更新</button>
+        <button id="btn-refresh">立即重新整理</button>
         <button id="btn-toggle">暫停自動更新</button>
         <select id="interval-select" title="更新頻率">
-          <option value="2000">每 2 秒</option>
-          <option value="3000" selected>每 3 秒</option>
-          <option value="5000">每 5 秒</option>
           <option value="10000">每 10 秒</option>
+          <option value="15000" selected>每 15 秒</option>
+          <option value="30000">每 30 秒</option>
+          <option value="60000">每 60 秒</option>
         </select>
+        <a id="btn-ext" href="#" target="_blank" rel="noopener">新視窗開啟 ↗</a>
       </div>
     </div>
 
-    <div class="screen-box" id="screen-box">
-      <div class="msg">請點選上方任一監視器名稱開始觀看</div>
-    </div>
+    <div class="screen-box" id="screen-box"></div>
     <div id="update-time" style="margin-top:8px;font-size:12px;color:#94a3b8;"></div>
   </div>
 
   <script>
-    // ==================================================
-    // 在這裡放入你想看的監視器名稱與影像網址
-    // （支援定時更新的 JPG 網址，也支援 MJPEG 串流）
-    // ==================================================
     const CAMERAS = [
       {
-        name: "測試畫面 1（每 3 秒看動態）",
-        url: "https://picsum.photos/800/500"
+        name: "自訂監視器 A (KHC000361)",
+        url: "https://tw.live/cam/?id=KHC000361"
       },
       {
-        name: "自訂監視器 A",
-        url: "" // 填入你的監視器影像網址
-      },
-      {
-        name: "自訂監視器 B",
-        url: "" // 填入你的監視器影像網址
+        name: "自訂監視器 B (KHC000417)",
+        url: "https://tw.live/cam/?id=KHC000417"
       }
     ];
 
@@ -153,69 +133,43 @@
     const btnRefresh = document.getElementById("btn-refresh");
     const btnToggle = document.getElementById("btn-toggle");
     const intervalSelect = document.getElementById("interval-select");
+    const btnExt = document.getElementById("btn-ext");
 
     let currentCam = null;
     let timerId = null;
     let isAutoRefresh = true;
 
-    // 加上時間戳記，避免瀏覽器沿用舊快取
-    function buildCacheBustUrl(rawUrl) {
-      const sep = rawUrl.includes("?") ? "&" : "?";
-      return `${rawUrl}${sep}_t=${Date.now()}`;
-    }
-
-    // 抓取並顯示最新一張畫面
-    function fetchLatestFrame() {
+    function loadCameraFrame() {
       if (!currentCam) return;
 
-      if (!currentCam.url) {
-        screenBoxEl.innerHTML = `<div class="msg">「${currentCam.name}」尚未填入影像網址</div>`;
-        updateTimeEl.textContent = "";
-        return;
-      }
+      screenBoxEl.innerHTML = `<iframe src="${currentCam.url}" allowfullscreen loading="eager"></iframe>`;
+      btnExt.href = currentCam.url;
 
-      const img = document.createElement("img");
-      img.alt = currentCam.name;
-
-      img.onload = () => {
-        screenBoxEl.innerHTML = "";
-        screenBoxEl.appendChild(img);
-        const now = new Date().toLocaleTimeString("zh-TW", { hour12: false });
-        updateTimeEl.textContent = `最後更新時間：${now}`;
-      };
-
-      img.onerror = () => {
-        screenBoxEl.innerHTML = `<div class="msg">無法載入此影像網址<br/>（可能是網址失效、需 HTTPS 代理，或來源阻擋跨網域）</div>`;
-      };
-
-      // 先載入到記憶體 img，成功 onload 後再替換畫面，避免閃爍
-      img.src = buildCacheBustUrl(currentCam.url);
+      const now = new Date().toLocaleTimeString("zh-TW", { hour12: false });
+      updateTimeEl.textContent = `最後載入時間：${now}`;
     }
 
-    // 啟動或重設計時器
     function restartTimer() {
       if (timerId) {
         clearInterval(timerId);
         timerId = null;
       }
-      if (currentCam && currentCam.url && isAutoRefresh) {
+      if (currentCam && isAutoRefresh) {
         const ms = parseInt(intervalSelect.value, 10);
-        timerId = setInterval(fetchLatestFrame, ms);
+        timerId = setInterval(loadCameraFrame, ms);
       }
     }
 
-    // 選擇監視器
     function selectCamera(cam, btnEl) {
       currentCam = cam;
       document.querySelectorAll(".cam-btn").forEach(b => b.classList.remove("active"));
       if (btnEl) btnEl.classList.add("active");
 
       camTitleEl.textContent = `目前觀看：${cam.name}`;
-      fetchLatestFrame();
+      loadCameraFrame();
       restartTimer();
     }
 
-    // 建立按鈕清單
     CAMERAS.forEach((cam, idx) => {
       const btn = document.createElement("button");
       btn.className = "cam-btn";
@@ -223,15 +177,12 @@
       btn.addEventListener("click", () => selectCamera(cam, btn));
       camListEl.appendChild(btn);
 
-      // 預設先選第一顆方便立刻測試
       if (idx === 0) {
         selectCamera(cam, btn);
       }
     });
 
-    btnRefresh.addEventListener("click", () => {
-      fetchLatestFrame();
-    });
+    btnRefresh.addEventListener("click", loadCameraFrame);
 
     btnToggle.addEventListener("click", () => {
       isAutoRefresh = !isAutoRefresh;
@@ -239,16 +190,13 @@
       restartTimer();
     });
 
-    intervalSelect.addEventListener("change", () => {
-      restartTimer();
-    });
+    intervalSelect.addEventListener("change", restartTimer);
 
-    // 分頁切到背景時自動省電暫停，切回來立刻更新
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         if (timerId) clearInterval(timerId);
       } else if (currentCam && isAutoRefresh) {
-        fetchLatestFrame();
+        loadCameraFrame();
         restartTimer();
       }
     });
