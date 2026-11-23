@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>高雄市即時路況監視器</title>
+  <title>免帳號路況攝影機地圖（高速公路／公開路況）</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { box-sizing: border-box; }
@@ -11,72 +11,50 @@
       margin: 0;
       padding: 0;
       height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     #map { width: 100%; height: 100vh; }
 
-    /* 頂部控制面板 */
-    .control-panel {
+    .panel {
       position: fixed;
       top: 12px;
       left: 12px;
       right: 12px;
       z-index: 1000;
+      max-width: 720px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.96);
+      padding: 10px 14px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.16);
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 10px 14px;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-      max-width: 650px;
-      margin: 0 auto;
     }
-    select, button {
-      padding: 8px 12px;
+    select, button, input {
+      padding: 8px 11px;
       border-radius: 8px;
-      border: 1px solid #d0d7de;
+      border: 1px solid #cbd5e1;
       font-size: 14px;
       background: #fff;
-      cursor: pointer;
     }
-    button.primary {
-      background: #1a73e8;
-      color: #fff;
-      border: none;
-      font-weight: 500;
-    }
-    button.primary:active { background: #1557b0; }
-    button.active-filter {
-      background: #e63946;
-      color: #fff;
-      border-color: #e63946;
-    }
-    .status-text {
+    button { cursor: pointer; font-weight: 500; }
+    button.primary { background: #0284c7; color: #fff; border: none; }
+    button.primary:hover { background: #0369a1; }
+    .status {
       width: 100%;
       font-size: 12px;
-      color: #555;
-      margin-top: 2px;
+      color: #475569;
     }
-
-    /* 影像 Popup 視窗 */
-    .cctv-popup { width: 290px; }
-    .cctv-popup h4 {
-      margin: 0 0 4px 0;
-      font-size: 15px;
-      color: #1a73e8;
-    }
-    .cctv-popup .meta {
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 8px;
-    }
-    .cctv-stream {
+    .cctv-popup { width: 300px; }
+    .cctv-popup h4 { margin: 0 0 4px; font-size: 15px; color: #0284c7; }
+    .cctv-popup .sub { font-size: 12px; color: #64748b; margin-bottom: 8px; }
+    .cctv-img {
       width: 100%;
-      height: 190px;
-      background: #111;
+      height: 185px;
       object-fit: cover;
+      background: #0f172a;
       border-radius: 6px;
       display: block;
     }
@@ -84,103 +62,159 @@
 </head>
 <body>
 
-  <div class="control-panel">
-    <select id="district-select">
-      <option value="ALL">全部行政區</option>
-      <option value="鳳山區">鳳山區</option>
-      <option value="三民區">三民區</option>
-      <option value="左營區">左營區</option>
-      <option value="鼓山區">鼓山區</option>
-      <option value="苓雅區">苓雅區</option>
-      <option value="前鎮區">前鎮區</option>
-      <option value="新興區">新興區</option>
-      <option value="前金區">前金區</option>
-      <option value="鹽埕區">鹽埕區</option>
-      <option value="楠梓區">楠梓區</option>
-      <option value="小港區">小港區</option>
-      <option value="仁武區">仁武區</option>
-      <option value="鳥松區">鳥松區</option>
-      <option value="大寮區">大寮區</option>
-      <option value="林園區">林園區</option>
-      <option value="岡山區">岡山區</option>
-      <option value="橋頭區">橋頭區</option>
-      <option value="路竹區">路竹區</option>
-      <option value="旗山區">旗山區</option>
-      <option value="美濃區">美濃區</option>
-      <option value="杉林區">杉林區</option>
+  <div class="panel">
+    <select id="highway-filter">
+      <option value="ALL">全部路線 / 節點</option>
+      <option value="國道1號">國道1號（中山高）</option>
+      <option value="國道3號">國道3號（福高）</option>
+      <option value="國道10號">國道10號（高雄支線）</option>
+      <option value="快速道路">快速道路 / 省道</option>
     </select>
 
-    <button id="btn-nearby" class="primary">📍 我附近 1 公里內</button>
-    <button id="btn-reset">顯示全部</button>
-    <div id="status" class="status-text">正在連線至代理伺服器載入資料...</div>
+    <button id="btn-reload" class="primary">重新載入公開路況</button>
+    <button id="btn-locate">📍 定位附近</button>
+    <div id="status" class="status">正在嘗試抓取免帳號公開路況資料...</div>
   </div>
 
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // ====================================================
-    // 1. 請填入你的 Cloudflare Worker 網址 (結尾不要加斜線)
-    // ====================================================
-    const WORKER_URL = "https://你的worker名稱.你的帳號.workers.dev";
-
     const statusEl = document.getElementById("status");
-    const districtSelect = document.getElementById("district-select");
-    const btnNearby = document.getElementById("btn-nearby");
-    const btnReset = document.getElementById("btn-reset");
+    const highwayFilter = document.getElementById("highway-filter");
+    const btnReload = document.getElementById("btn-reload");
+    const btnLocate = document.getElementById("btn-locate");
 
-    // 初始化地圖 (預設鳳山區中心)
-    const map = L.map("map", { zoomControl: false }).setView([22.6273, 120.3575], 13);
-    L.control.zoom({ position: "bottomright" }).addTo(map);
-
+    // 預設聚焦南台灣 / 高雄周邊高速公路網
+    const map = L.map("map").setView([22.66, 120.34], 11);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap"
     }).addTo(map);
 
-    let allCCTVs = [];
-    let markersLayer = L.layerGroup().addTo(map);
-    let userLocationMarker = null;
-    let userRadiusCircle = null;
+    const markersLayer = L.layerGroup().addTo(map);
+    let allCams = [];
 
-    // 計算兩點經緯度距離 (單位：公里，Haversine 公式)
-    function getDistanceKm(lat1, lon1, lat2, lon2) {
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
-
-    // 轉換串流網址 (如果是 http:// 就自動走 Worker Proxy 轉成 https://)
-    function getSafeStreamUrl(rawUrl) {
-      if (!rawUrl) return "";
-      if (rawUrl.startsWith("http://")) {
-        return `${WORKER_URL}/stream?url=${encodeURIComponent(rawUrl)}`;
+    // 公開路況候選來源清單（免帳號金鑰）
+    // 註：部分政府 XML/JSON 端點若遇瀏覽器 CORS 阻擋，會自動轉向備援清單
+    const PUBLIC_ENDPOINTS = [
+      {
+        name: "高速公路局公開 CCTV XML",
+        url: "https://tisvcloud.freeway.gov.tw/history/motc_cctv/cctvNode.xml",
+        type: "xml"
+      },
+      {
+        name: "公路局省道公開 CCTV XML",
+        url: "https://cctv.thb.gov.tw/cctv/cctvNode.xml",
+        type: "xml"
       }
-      return rawUrl;
+    ];
+
+    // 內建高雄與國道1號/國道10號周邊常見路況示範點（確保無 CORS 或離線測試時仍可操作地圖）
+    const FALLBACK_SAMPLE_CAMS = [
+      {
+        id: "DEMO-01",
+        name: "國道1號 鼎金系統交流道",
+        road: "國道1號",
+        desc: "高雄段主線參考點（需依實際串流網址連線）",
+        lat: 22.6776,
+        lon: 120.3238,
+        imgUrl: ""
+      },
+      {
+        id: "DEMO-02",
+        name: "國道1號 中正交流道",
+        road: "國道1號",
+        desc: "苓雅／鳳山交界交流道參考點",
+        lat: 22.6266,
+        lon: 120.3402,
+        imgUrl: ""
+      },
+      {
+        id: "DEMO-03",
+        name: "國道10號 仁武交流道",
+        road: "國道10號",
+        desc: "往旗山／美濃方向參考點",
+        lat: 22.6995,
+        lon: 120.3652,
+        imgUrl: ""
+      },
+      {
+        id: "DEMO-04",
+        name: "台88線 鳳山交流道",
+        road: "快速道路",
+        desc: "往大寮／屏東方向參考點",
+        lat: 22.5892,
+        lon: 120.3695,
+        imgUrl: ""
+      }
+    ];
+
+    // 解析高公局 / 公路局 XML CCTV 節點
+    function parseCctvXml(xmlText, sourceLabel) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, "application/xml");
+      const nodes = Array.from(doc.querySelectorAll("CCTV"));
+
+      return nodes.map((node, idx) => {
+        const getText = (tag) => node.querySelector(tag)?.textContent?.trim() || "";
+        const lat = parseFloat(getText("PositionLat") || getText("Lat") || getText("lat"));
+        const lon = parseFloat(getText("PositionLon") || getText("Lon") || getText("lon"));
+        const road = getText("RoadName") || getText("FreewayID") || sourceLabel;
+        const name = getText("RoadSectionName") || getText("SurveillanceDescription") || `攝影機 ${idx + 1}`;
+        const mile = getText("RoadMileage") || getText("Mileage") || "";
+        const imgUrl = getText("VideoStreamURL") || getText("SnapshotURL") || getText("ImageURL") || "";
+
+        return {
+          id: getText("CCTVID") || `CAM-${idx}`,
+          name: mile ? `${name} (${mile})` : name,
+          road,
+          desc: `${sourceLabel}｜${getText("Direction") || ""}`,
+          lat,
+          lon,
+          imgUrl
+        };
+      }).filter(item => !Number.isNaN(item.lat) && !Number.isNaN(item.lon));
     }
 
-    // 渲染標記到地圖上
-    function renderMarkers(list, fitBounds = false) {
+    // 嘗試從公開端點抓取資料
+    async function loadPublicCams() {
+      statusEl.textContent = "正在連線公開路況端點...";
+      const collected = [];
+
+      for (const ep of PUBLIC_ENDPOINTS) {
+        try {
+          const res = await fetch(ep.url);
+          if (!res.ok) continue;
+          const text = await res.text();
+          if (ep.type === "xml") {
+            const parsed = parseCctvXml(text, ep.name);
+            collected.push(...parsed);
+          }
+        } catch (err) {
+          // 瀏覽器若因 CORS 阻擋跨網域 XML，會進到這裡並繼續嘗試下一個來源
+          console.warn(`無法直接於瀏覽器讀取 ${ep.name}:`, err.message);
+        }
+      }
+
+      if (collected.length > 0) {
+        allCams = collected;
+        statusEl.textContent = `已載入 ${allCams.length} 支公開路況攝影機節點（免帳號）`;
+      } else {
+        allCams = FALLBACK_SAMPLE_CAMS;
+        statusEl.textContent = "目前瀏覽器受跨網域(CORS)或網路限制無法直抓 XML，已載入高雄國道／快速道路節點範例";
+      }
+
+      applyFilter();
+    }
+
+    // 渲染地圖標記
+    function renderCams(list) {
       markersLayer.clearLayers();
-      const bounds = [];
 
       list.forEach(cam => {
-        const lat = cam.PositionLat;
-        const lon = cam.PositionLon;
-        if (!lat || !lon || !cam.VideoStreamURL) return;
-
-        bounds.push([lat, lon]);
-        const roadName = cam.RoadName || "未命名路段";
-        const desc = cam.SurveillanceDescription || cam.Direction || "";
-        const district = cam.TownName || "";
-        const safeUrl = getSafeStreamUrl(cam.VideoStreamURL);
-
-        const marker = L.circleMarker([lat, lon], {
+        const marker = L.circleMarker([cam.lat, cam.lon], {
           radius: 7,
-          fillColor: "#e63946",
+          fillColor: "#0284c7",
           color: "#ffffff",
           weight: 2,
           opacity: 1,
@@ -188,129 +222,71 @@
         });
 
         marker.on("click", () => {
-          const popupHtml = `
+          const imgBlock = cam.imgUrl
+            ? `<img class="cctv-img" src="${cam.imgUrl}" alt="即時影像" onerror="this.alt='影像暫時無法載入（可能需 HTTPS 或同源代理）';" />`
+            : `<div class="cctv-img" style="display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;padding:10px;text-align:center;">此示範節點未附串流網址<br/>可直接於下方測試自訂影像網址</div>`;
+
+          const html = `
             <div class="cctv-popup">
-              <h4>${roadName}</h4>
-              <div class="meta">${district} ${desc}</div>
-              <img class="cctv-stream" src="${safeUrl}" alt="影像載入中..." 
-                   onerror="this.alt='此攝影機目前離線或無訊號';" />
+              <h4>${cam.name}</h4>
+              <div class="sub">${cam.road}｜${cam.desc}</div>
+              ${imgBlock}
             </div>
           `;
-          marker.bindPopup(popupHtml, { maxWidth: 310 }).openPopup();
+          marker.bindPopup(html, { maxWidth: 320 }).openPopup();
         });
 
         markersLayer.addLayer(marker);
       });
-
-      statusEl.textContent = `目前顯示 ${bounds.length} 支攝影機（點擊紅點觀看即時影像）`;
-
-      if (fitBounds && bounds.length > 0) {
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-      }
     }
 
-    // 清除 GPS 範圍圈
-    function clearUserLocationOverlay() {
-      if (userLocationMarker) map.removeLayer(userLocationMarker);
-      if (userRadiusCircle) map.removeLayer(userRadiusCircle);
-      btnNearby.classList.remove("active-filter");
-    }
-
-    // 事件：依行政區篩選
-    districtSelect.addEventListener("change", (e) => {
-      clearUserLocationOverlay();
-      const selected = e.target.value;
-      if (selected === "ALL") {
-        renderMarkers(allCCTVs, false);
+    // 依路線篩選
+    function applyFilter() {
+      const val = highwayFilter.value;
+      if (val === "ALL") {
+        renderCams(allCams);
         return;
       }
 
-      const filtered = allCCTVs.filter(cam =>
-        (cam.TownName && cam.TownName.includes(selected)) ||
-        (cam.SurveillanceDescription && cam.SurveillanceDescription.includes(selected))
+      const filtered = allCams.filter(c =>
+        (c.road && c.road.includes(val)) ||
+        (c.name && c.name.includes(val)) ||
+        (c.desc && c.desc.includes(val))
       );
 
-      if (filtered.length === 0) {
-        statusEl.textContent = `${selected} 目前無 TDX 連線攝影機資料`;
-        markersLayer.clearLayers();
-      } else {
-        renderMarkers(filtered, true);
-      }
-    });
+      renderCams(filtered);
+      statusEl.textContent = `篩選「${val}」：共 ${filtered.length} 個節點`;
+    }
 
-    // 事件：定位我附近 1 公里內
-    btnNearby.addEventListener("click", () => {
+    highwayFilter.addEventListener("change", applyFilter);
+    btnReload.addEventListener("click", loadPublicCams);
+
+    btnLocate.addEventListener("click", () => {
       if (!navigator.geolocation) {
-        alert("您的瀏覽器不支援 GPS 定位功能");
+        statusEl.textContent = "此瀏覽器不支援定位";
         return;
       }
-
-      statusEl.textContent = "正在取得您的 GPS 位置...";
-      districtSelect.value = "ALL";
-
+      statusEl.textContent = "正在取得目前位置...";
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const userLat = pos.coords.latitude;
-          const userLon = pos.coords.longitude;
-
-          clearUserLocationOverlay();
-          btnNearby.classList.add("active-filter");
-
-          // 標記目前位置與 1 公里半徑圈
-          userLocationMarker = L.marker([userLat, userLon])
-            .addTo(map)
-            .bindPopup("您的目前位置")
-            .openPopup();
-
-          userRadiusCircle = L.circle([userLat, userLon], {
-            radius: 1000,
-            color: "#1a73e8",
-            fillColor: "#1a73e8",
-            fillOpacity: 0.1
-          }).addTo(map);
-
-          // 篩選距離 <= 1.0 公里的攝影機
-          const nearbyCCTVs = allCCTVs.filter(cam => {
-            if (!cam.PositionLat || !cam.PositionLon) return false;
-            return getDistanceKm(userLat, userLon, cam.PositionLat, cam.PositionLon) <= 1.0;
-          });
-
-          map.setView([userLat, userLon], 15);
-          renderMarkers(nearbyCCTVs, false);
-          statusEl.textContent = `您附近 1 公里內共有 ${nearbyCCTVs.length} 支攝影機`;
+          const { latitude, longitude } = pos.coords;
+          map.setView([latitude, longitude], 13);
+          L.circleMarker([latitude, longitude], {
+            radius: 8,
+            fillColor: "#16a34a",
+            color: "#fff",
+            weight: 2,
+            fillOpacity: 1
+          }).addTo(markersLayer).bindPopup("你的目前位置").openPopup();
+          statusEl.textContent = `已定位至目前位置（${latitude.toFixed(4)}, ${longitude.toFixed(4)}）`;
         },
         (err) => {
-          statusEl.textContent = `定位失敗：請確認已允許網頁存取位置權限 (${err.message})`;
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
+          statusEl.textContent = `定位失敗：${err.message}`;
+        }
       );
     });
 
-    // 事件：重設顯示全部
-    btnReset.addEventListener("click", () => {
-      clearUserLocationOverlay();
-      districtSelect.value = "ALL";
-      renderMarkers(allCCTVs, false);
-    });
-
-    // 初始化載入資料
-    async function init() {
-      try {
-        if (WORKER_URL.includes("你的worker名稱")) {
-          statusEl.textContent = "請先設定程式碼中的 WORKER_URL";
-          return;
-        }
-        const res = await fetch(`${WORKER_URL}/cctv`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        allCCTVs = data.CCTVs || [];
-        renderMarkers(allCCTVs, false);
-      } catch (err) {
-        statusEl.textContent = `資料載入失敗：${err.message}`;
-      }
-    }
-
-    init();
+    loadPublicCams();
   </script>
 </body>
 </html>
